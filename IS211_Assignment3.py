@@ -1,57 +1,60 @@
-import argparse
-import pandas as pd
+import csv
 import re
 from collections import Counter
-from urllib.request import urlretrieve
+from datetime import datetime
 
-def download_file(url, local_filename):
-    urlretrieve(url, local_filename)
-    return local_filename
+# Function to process the CSV file and return its data
+def process_file(filename):
+    data = []
+    with open(filename, newline='') as csvfile:
+        logreader = csv.reader(csvfile)
+        for row in logreader:
+            data.append(row)
+    return data
 
-def is_image_path(path):
-    """Check if the given path is for an image."""
-    return bool(re.search(r'\.(jpg|jpeg|gif|png)$', path, re.IGNORECASE))
+# Function to calculate and print the percentage of image requests
+def calculate_image_stats(data):
+    total_hits = len(data)
+    image_hits = sum(1 for row in data if re.search(r'\.(jpg|gif|png|JPG|GIF|PNG)$', row[0]))
+    image_percentage = (image_hits / total_hits) * 100 if total_hits > 0 else 0
+    print(f"Image requests account for {image_percentage:.2f}% of all requests")
 
-def identify_browser(user_agent):
-    """Identify the browser from a user agent string."""
-    if 'Firefox' in user_agent:
-        return 'Firefox'
-    elif 'MSIE' in user_agent or 'Trident' in user_agent:
-        return 'Internet Explorer'
-    elif 'Chrome' in user_agent:
-        return 'Chrome'
-    elif 'Safari' in user_agent and 'Chrome' not in user_agent:
-        return 'Safari'
-    else:
-        return 'Other'
-
-def process_log_file(file_path):
-    data = pd.read_csv(file_path, header=None, names=['Path', 'Timestamp', 'UserAgent', 'StatusCode', 'Size'])
+# Function to determine and print the most popular browser
+def find_most_popular_browser(data):
+    browser_counts = Counter()
+    browsers = ['Firefox', 'Chrome', 'Internet Explorer', 'Safari']
     
-    # Filter for image hits
-    image_hits = data[data['Path'].apply(is_image_path)]
-    print(f"Total image hits: {len(image_hits)}")
+    for row in data:
+        user_agent = row[2]
+        for browser in browsers:
+            if browser in user_agent:
+                browser_counts[browser] += 1
+                break
 
-    # Determine the most popular browser
-    browsers = data['UserAgent'].apply(identify_browser)
-    browser_counts = Counter(browsers)
-    most_popular_browser = browser_counts.most_common(1)[0]
-    print(f"Most popular browser: {most_popular_browser[0]} with {most_popular_browser[1]} hits")
+    most_common_browser, count = browser_counts.most_common(1)[0]
+    print(f"The most popular browser is {most_common_browser} with {count} hits")
 
-    # Optional: Summarize hits by hour
-    data['Timestamp'] = pd.to_datetime(data['Timestamp'])
-    hits_by_hour = data['Timestamp'].dt.hour.value_counts().sort_index()
-    print("Hits by hour:")
-    print(hits_by_hour)
+# Function to calculate and print the number of hits per hour
+def hits_per_hour(data):
+    hour_counts = Counter(datetime.strptime(row[1], '%Y-%m-%d %H:%M:%S').hour for row in data)
+    
+    for hour in range(24):
+        print(f"Hour {hour:02d} has {hour_counts[hour]} hits")
 
-def main(url, local_filename='weblog.csv'):
-    print(f"Downloading file from {url}...")
-    file_path = download_file(url, local_filename)
-    print(f"Processing log file: {file_path}")
-    process_log_file(file_path)
+# Main execution function
+def main():
+    # Replace 'weblog.csv' with your actual log file path
+    file_path = 'weblog (1).csv'
+    data = process_file(file_path)
+    
+    print("\nCalculating image statistics...")
+    calculate_image_stats(data)
+    
+    print("\nDetermining the most popular browser...")
+    find_most_popular_browser(data)
+    
+    print("\nCalculating hits per hour (Extra Credit)...")
+    hits_per_hour(data)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--url", help="URL to the datafile", type=str, required=True)
-    args = parser.parse_args()
-    main(args.url)
+if __name__ == '__main__':
+    main()
